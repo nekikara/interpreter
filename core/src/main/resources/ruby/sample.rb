@@ -59,7 +59,9 @@ def list?(exp)
 end
 
 def special_form?(exp)
-  lambda?(exp) or let?(exp)
+  lambda?(exp) or
+      let?(exp) or
+      letrec?(exp) or if?(exp)
 end
 
 def lambda?(exp)
@@ -69,13 +71,34 @@ end
 def eval_special_form(exp, env)
   if lambda?(exp)
     eval_lambda(exp, env)
-  else
+  elsif let?(exp)
     eval_let(exp, env)
+  elsif letrec?(exp)
+    eval_letrec(exp, env)
+  elsif if?(exp)
+    eval_if(exp, env)
   end
 end
 
 def eval_list(exp, env)
   exp.map{|e| _eval(e, env)}
+end
+
+def eval_if(exp, env)
+  cond, true_clause, false_clause = if_to_cond_true_false(exp)
+  if _eval(cond, env)
+    _eval(true_clause, env)
+  else
+    _eval(false_clause, env)
+  end
+end
+
+def if_to_cond_true_false(exp)
+  [exp[1], exp[2], exp[3]]
+end
+
+def if?(exp)
+  exp[0] == :if
 end
 
 def apply(fun, args)
@@ -95,16 +118,9 @@ def primitive_fun?(exp)
   exp[0] == :prim
 end
 
-
 def lookup_primitive_fun(exp)
   $primitive_fun_env[exp]
 end
-
-$primitive_fun_env = {
-  :+ => [:prim, lambda{|x, y| x + y}],
-  :- => [:prim, lambda{|x, y| x - y}],
-  :* => [:prim, lambda{|x, y| x * y}],
-}
 
 def _eval(exp, env)
   if not list?(exp)
@@ -124,7 +140,18 @@ def _eval(exp, env)
   end
 end
 
-$global_env = [$primitive_fun_env]
+$primitive_fun_env = {
+    :+ => [:prim, lambda{|x, y| x + y}],
+    :- => [:prim, lambda{|x, y| x - y}],
+    :* => [:prim, lambda{|x, y| x * y}],
+    :> => [:prim, lambda{|x, y| x > y}],
+    :>= => [:prim, lambda{|x, y| x >= y}],
+    :< => [:prim, lambda{|x, y| x < y}],
+    :<= => [:prim, lambda{|x, y| x <= y}],
+    :== => [:prim, lambda{|x, y| x == y}],
+}
+$boolean_env = { true: true, false: false }
+$global_env = [$primitive_fun_env, $boolean_env]
 
 exp = [[:lambda, [:x, :y], [:+, :x, :y]], 3, 2]
 puts _eval(exp, $global_env)
