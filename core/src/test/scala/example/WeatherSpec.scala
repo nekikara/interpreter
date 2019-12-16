@@ -1,6 +1,6 @@
 package example
 
-import example.core.{Bind, Binds, Env, EnvStack, Exp, Lambda, Let, Num, Opts, Sym, Vars, Weather}
+import example.core._
 import org.scalatest._
 
 class WeatherSpec extends FunSuite with DiagrammedAssertions {
@@ -8,43 +8,41 @@ class WeatherSpec extends FunSuite with DiagrammedAssertions {
     assert(Weather.eval(Num(2)) == Num(2))
   }
   test("can eval a plus operation") {
-    val expression = Exp(Opts.plus, Num(1), Num(2))
+    val expression = Exp(Plus(), Num(1), Num(2))
     val result = Weather.eval(expression)
     assert(result == Num(3))
   }
   test("can eval a minus operation") {
-    val expression = Exp(Opts.minus, Num(10), Num(2))
+    val expression = Exp(Minus(), Num(10), Num(2))
     val result = Weather.eval(expression)
     assert(result == Num(8))
   }
   test("can eval a multiply operation") {
-    val expression = Exp(Opts.multiply, Num(10), Num(2))
+    val expression = Exp(Multiply(), Num(10), Num(2))
     val result = Weather.eval(expression)
     assert(result == Num(20))
   }
   test("can eval a nested Expression") {
-    val expression = Exp(Opts.plus,
-      Exp(Opts.minus, Num(10), Num(2)),
-      Exp(Opts.multiply,
+    val expression = Exp(Plus(),
+      Exp(Minus(), Num(10), Num(2)),
+      Exp(Multiply(),
         Num(2),
-        Exp(Opts.plus, Num(1), Num(2))))
+        Exp(Plus(), Num(1), Num(2))))
     val result = Weather.eval(expression)
     val expect = (10 - 2) + (2 * (1 + 2))
     assert(result == Num(expect))
   }
   test("can eval a let expression as a lambda") {
     val binds = Binds(Bind(Sym('x), Num(3)), Bind(Sym('y), Num(2)))
-    val body = Exp(Opts.plus, Sym('x), Sym('y))
+    val body = Exp(Plus(), Sym('x), Sym('y))
     val act = Weather.convertLetToLambda(binds, body)
-    val expect = (Lambda(Opts.lambda, Vars(Sym('x), Sym('y)), body), List(Num(3), Num(2)))
+    val expect = (Lambda(Vars(Sym('x), Sym('y)), body), List(Num(3), Num(2)))
     assert(act == expect)
   }
   test("can eval an Expression with let") {
-    val exp = Let(Sym('let),
-                    Binds(
-                      Bind(Sym('x), Num(3)),
-                      Bind(Sym('y), Num(2))),
-                    Exp(Opts.plus, Sym('x), Sym('y), Sym('y)))
+    val exp = Let(Binds( Bind(Sym('x), Num(3)),
+                         Bind(Sym('y), Num(2))),
+                    Exp(Plus(), Sym('x), Sym('y), Sym('y)))
     val act = Weather.eval(exp)
     val expect = 3 + 2 + 2
     assert(act == Num(expect))
@@ -63,25 +61,24 @@ class WeatherSpec extends FunSuite with DiagrammedAssertions {
     assert(act == expect)
   }
   test("can eval a lambda Expression") {
-    val lambda = Lambda(Opts.lambda,
-      Vars( Sym('x), Sym('y) ),
-      Exp(Opts.plus, Sym('x), Sym('y), Sym('y)))
+    val lambda = Lambda( Vars( Sym('x), Sym('y) ),
+                  Exp(Plus(), Sym('x), Sym('y), Sym('y)))
     val exp = Exp(lambda, Num(9), Num(20))
     val act = Weather.eval(exp)
     val expect = 9 + 20 + 20
     assert(act == Num(expect))
   }
   test("can eval second lambda Expression") {
-    val let = Let(Opts.let, Binds( Bind(Sym('x), Num(2)) ),
-                Let(Opts.let, Binds(Bind(Sym('fun), Lambda(Opts.lambda, Vars(), Sym('x)))),
-                  Let(Opts.let, Binds(Bind(Sym('x), Num(1))),
+    val let = Let(Binds( Bind(Sym('x), Num(2)) ),
+                Let(Binds(Bind(Sym('fun), Lambda(Vars(), Sym('x)))),
+                  Let(Binds(Bind(Sym('x), Num(1))),
                     Exp(Sym('fun))) ) )
     val act = Weather.eval(let)
     val expect = Num(2)
     assert(act == expect)
   }
   test("can eval third lambda Expression") {
-    val let = Let(Opts.let, Binds(Bind(Sym('fun), Lambda(Opts.lambda, Vars(), Num(1)))),
+    val let = Let(Binds(Bind(Sym('fun), Lambda(Vars(), Num(1)))),
                     Exp(Sym('fun)))
     val act = Weather.eval(let)
     val expect = Num(1)
