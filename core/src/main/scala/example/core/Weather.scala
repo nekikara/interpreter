@@ -1,5 +1,15 @@
 package example.core
 
+object Ope extends Enumeration {
+  protected case class Val(func: (Num, Num) => Num) extends super.Val
+  import scala.language.implicitConversions
+  implicit def valueToOpeVal(x: Value): Val = x.asInstanceOf[Val]
+
+  val Plus: Val = Val((x: Num, y: Num) => x + y)
+  val Minus: Val = Val((x: Num, y: Num) => x - y)
+  val Multiply: Val = Val((x: Num, y: Num) => x * y)
+}
+
 sealed abstract class Expression {
   def ++(es: Expression*): Exp = {
     if (es.isEmpty) {
@@ -14,13 +24,11 @@ sealed abstract class Expression {
 case class Exp(es: Expression*) extends Expression
 case class Sym(s: Symbol) extends Expression
 case class Num(n: Int) extends Expression {
-  def +(that: Num) = Num(this.n + that.n)
-  def -(that: Num) = Num(this.n - that.n)
-  def *(that: Num) = Num(this.n * that.n)
+  def +(that: Num): Num = Num(this.n + that.n)
+  def -(that: Num): Num = Num(this.n - that.n)
+  def *(that: Num): Num = Num(this.n * that.n)
 }
-case class Plus() extends Expression
-case class Minus() extends Expression
-case class Multiply() extends Expression
+case class Func(operator: Ope.Value) extends Expression
 case class Let(binds: Binds, body: Expression) extends Expression
 case class Bind(s: Sym, n: Expression) extends Expression
 case class Binds(binds: Bind*) extends Expression
@@ -33,6 +41,7 @@ case class Env(map: Map[Sym, Expression])
 case class EnvStack(envs: List[Env])
 
 object Weather {
+  @scala.annotation.tailrec
   def eval(exp: Expression, envStack: EnvStack = EnvStack(List.empty[Env])): Num =  exp match {
     case Num(n) => Num(n)
     case Let(binds, body) => evalLet(binds, body, envStack)
@@ -53,21 +62,14 @@ object Weather {
     ope match {
       case Lambda(vars, body) => evalClosure(vars, body, stack, es:_*)
       case Closure(vars, body, localEnv) => evalClosure(vars, body, localEnv, es:_*)
-      case Plus() => operate(plus, stack, es:_*)
-      case Minus() => operate(minus, stack, es:_*)
-      case Multiply() => operate(multiply, stack, es:_*)
-      case Sym(x) => {
+      case Func(ope: Ope.Value) => operate(ope.func, stack, es:_*)
+      case Sym(x) =>
         val exp = lookupVars(Sym(x), stack)
         val newExp = exp ++ (es:_*)
         eval(newExp, stack)
-      }
       case _ => throw new RuntimeException("Can't match any Operation")
     }
   }
-
-  def plus(x: Num, y: Num): Num = x + y
-  def minus(x: Num, y: Num): Num = x - y
-  def multiply(x: Num, y: Num): Num = x * y
 
   def convertLetToLambda(binds: Binds, body: Expression): (Lambda, List[Expression]) = {
     val (vars, args) = divideParamsAndArgs(binds)
