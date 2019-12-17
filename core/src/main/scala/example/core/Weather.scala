@@ -1,5 +1,13 @@
 package example.core
 
+sealed abstract class Primitive
+case class Num(n: Int) extends Primitive {
+  def +(that: Num): Num = Num(this.n + that.n)
+  def -(that: Num): Num = Num(this.n - that.n)
+  def *(that: Num): Num = Num(this.n * that.n)
+}
+case class Bool(b: Boolean) extends Primitive
+
 object Ope extends Enumeration {
   protected case class Val(func: (Num, Num) => Num) extends super.Val
   import scala.language.implicitConversions
@@ -13,7 +21,7 @@ object Ope extends Enumeration {
 sealed abstract class Expression {
   def ++(es: Expression*): Exp = {
     if (es.isEmpty) {
-      Exp(this, Num(0))
+      Exp(this, Prim(Num(0)))
     } else {
       es.tail.foldLeft(Exp(this, es.head)) {(acc, exp) => {
         Exp(acc.es :+ exp:_*)
@@ -23,11 +31,7 @@ sealed abstract class Expression {
 }
 case class Exp(es: Expression*) extends Expression
 case class Sym(s: Symbol) extends Expression
-case class Num(n: Int) extends Expression {
-  def +(that: Num): Num = Num(this.n + that.n)
-  def -(that: Num): Num = Num(this.n - that.n)
-  def *(that: Num): Num = Num(this.n * that.n)
-}
+case class Prim(p: Primitive) extends Expression
 case class Func(operator: Ope.Value) extends Expression
 case class Let(binds: Binds, body: Expression) extends Expression
 case class Bind(s: Sym, n: Expression) extends Expression
@@ -43,7 +47,7 @@ case class EnvStack(envs: List[Env])
 object Weather {
   @scala.annotation.tailrec
   def eval(exp: Expression, envStack: EnvStack = EnvStack(List.empty[Env])): Num =  exp match {
-    case Num(n) => Num(n)
+    case Prim(Num(n)) => Num(n)
     case Let(binds, body) => evalLet(binds, body, envStack)
     case Sym(x) => eval(lookupVars(Sym(x), envStack), envStack)
     case Exp(ope, es@_*) => evalOperation(ope, envStack, es:_*)
@@ -52,10 +56,13 @@ object Weather {
 
   def operate(fun: (Num, Num) => Num, envStack: EnvStack, exps: Expression*): Num = {
     val nums = exps.map {
-      case Num(n) => Num(n)
+      case Prim(Num(n)) => Num(n)
       case x => eval(x, envStack)
     }
-    nums.tail.foldLeft(nums.head)(fun)
+    nums.tail.foldLeft(nums.head)(fun) match {
+      case Num(n) => Num(n)
+      case x => throw new RuntimeException(s"Can't operate this $x")
+    }
   }
 
   def evalOperation(ope: Expression, stack: EnvStack, es: Expression*): Num = {
@@ -120,7 +127,7 @@ object Weather {
     })
     env match {
       case Some(x) => x.map(symbol) match {
-        case Num(n) => Num(n)
+        case Prim(n) => Prim(n)
         case x => x
       }
       case None => throw new RuntimeException("Not found the var")
