@@ -132,4 +132,14 @@ class WeatherSpec extends FunSuite with DiagrammedAssertions {
     val expect = Num(1)
     assert(act == expect)
   }
+  test("can eval a recursive expression but not evaling the recursive expression") {
+    val exp = Let(Binds(Bind(Sym('fact), Lambda(Vars(Sym('n)),
+                                          If(Cond(Cmp.Gt, Sym('n), Prim(Num(1))),
+                                            Prim(Num(1)),
+                                            Exp(Sym('fact), Exp(Func(Ope.Minus), Sym('n), Prim(Num(1)))))))),
+                Exp(Sym('fact), Prim(Num(0))))
+    val act = Weather.eval(exp)
+    val expect = Num(1)
+    assert(act == expect)
+  }
 }

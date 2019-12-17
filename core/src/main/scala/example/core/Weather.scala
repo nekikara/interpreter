@@ -51,7 +51,7 @@ case class Sym(s: Symbol) extends Expression
 case class Prim(p: Primitive) extends Expression
 case class Func(operator: Ope.Value) extends Expression
 case class Let(binds: Binds, body: Expression) extends Expression
-case class Cond(cmp: Cmp.Value, left: Prim, right: Prim) extends Expression
+case class Cond(cmp: Cmp.Value, left: Expression, right: Expression) extends Expression
 case class If(cond: Cond, tExp: Expression, fExp: Expression) extends Expression
 case class Bind(s: Sym, n: Expression) extends Expression
 case class Binds(binds: Bind*) extends Expression
@@ -100,15 +100,12 @@ object Weather {
   }
 
   def evalIf(cond: Cond, t: Expression, f: Expression, envStack: EnvStack): Num = {
-    cond match {
-      case Cond(cmp, Prim(Num(l)), Prim(Num(r))) =>
-        val b = cmp.func(Num(l), Num(r))
-        b match {
-          case Bool(true) => eval(t, envStack)
-          case _ => eval(f, envStack)
-        }
-      case _ => throw new RuntimeException("Can't eval Primitive except Num")
-
+    val left = eval(cond.left, envStack)
+    val right = eval(cond.right, envStack)
+    val b = cond.cmp.func(left, right)
+    b match {
+      case Bool(true) => eval(t, envStack)
+      case _ => eval(f, envStack)
     }
   }
 
@@ -164,7 +161,7 @@ object Weather {
         case Prim(n) => Prim(n)
         case x => x
       }
-      case None => throw new RuntimeException("Not found the var")
+      case None => throw new RuntimeException(s"Not found the var: $symbol, $stack")
     }
   }
 }
