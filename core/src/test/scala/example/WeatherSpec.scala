@@ -84,4 +84,52 @@ class WeatherSpec extends FunSuite with DiagrammedAssertions {
     val expect = Num(1)
     assert(act == expect)
   }
+  test("can eval a normal If Expression") {
+    val ifExp = If(Cond(Cmp.Eq, Prim(Num(2)), Prim(Num(2))),
+                  Prim(Num(1)),
+                  Prim(Num(2)))
+    val act = Weather.eval(ifExp)
+    val expect = Num(1)
+    assert(act == expect)
+  }
+  test("can eval an If expression with a let expression") {
+    val ifExp2 = If(Cond(Cmp.Neq, Prim(Num(1)), Prim(Num(2))),
+                  Let(Binds(Bind(Sym('x), Prim(Num(1000)))), Exp(Sym('x))),
+                  Prim(Num(2)))
+    val act2 = Weather.eval(ifExp2)
+    val expect2 = Num(1000)
+    assert(act2 == expect2)
+  }
+  test("can eval an If expression with Greater than") {
+    val ifExp = If(Cond(Cmp.Gt, Prim(Num(2)), Prim(Num(3))),
+                  Prim(Num(1)),
+                  Prim(Num(2)))
+    val act = Weather.eval(ifExp)
+    val expect = Num(1)
+    assert(act == expect)
+  }
+  test("can eval an If expression with Less than") {
+    val ifExp = If(Cond(Cmp.Lt, Prim(Num(2)), Prim(Num(3))),
+      Prim(Num(1)),
+      Prim(Num(2)))
+    val act = Weather.eval(ifExp)
+    val expect = Num(2)
+    assert(act == expect)
+  }
+  test("can eval an If expression with Greater than & Eq") {
+    val ifExp = If(Cond(Cmp.GtEq, Prim(Num(3)), Prim(Num(3))),
+      Prim(Num(1)),
+      Prim(Num(2)))
+    val act = Weather.eval(ifExp)
+    val expect = Num(1)
+    assert(act == expect)
+  }
+  test("can eval an If expression with Less than & Eq") {
+    val ifExp = If(Cond(Cmp.LtEq, Prim(Num(3)), Prim(Num(3))),
+      Prim(Num(1)),
+      Prim(Num(2)))
+    val act = Weather.eval(ifExp)
+    val expect = Num(1)
+    assert(act == expect)
+  }
 }

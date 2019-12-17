@@ -5,6 +5,10 @@ case class Num(n: Int) extends Primitive {
   def +(that: Num): Num = Num(this.n + that.n)
   def -(that: Num): Num = Num(this.n - that.n)
   def *(that: Num): Num = Num(this.n * that.n)
+  def <(that: Num): Bool = Bool(this.n < that.n)
+  def >(that: Num): Bool = Bool(this.n > that.n)
+  def <=(that: Num): Bool = Bool(this.n <= that.n)
+  def >=(that: Num): Bool = Bool(this.n >= that.n)
 }
 case class Bool(b: Boolean) extends Primitive
 
@@ -16,6 +20,19 @@ object Ope extends Enumeration {
   val Plus: Val = Val((x: Num, y: Num) => x + y)
   val Minus: Val = Val((x: Num, y: Num) => x - y)
   val Multiply: Val = Val((x: Num, y: Num) => x * y)
+}
+
+object Cmp extends Enumeration {
+  protected case class Val(func: (Num, Num) => Bool) extends super.Val
+  import scala.language.implicitConversions
+  implicit def valueToCmpVal(x: Value): Val = x.asInstanceOf[Val]
+
+  val Eq: Val = Val((x: Num, y: Num) => Bool(x == y))
+  val Neq: Val = Val((x: Num, y: Num) => Bool(x != y))
+  val Gt: Val = Val((x: Num, y: Num) => x < y)
+  val Lt: Val = Val((x: Num, y: Num) => x > y)
+  val GtEq: Val = Val((x: Num, y: Num) => x <= y)
+  val LtEq: Val = Val((x: Num, y: Num) => x >= y)
 }
 
 sealed abstract class Expression {
@@ -34,6 +51,8 @@ case class Sym(s: Symbol) extends Expression
 case class Prim(p: Primitive) extends Expression
 case class Func(operator: Ope.Value) extends Expression
 case class Let(binds: Binds, body: Expression) extends Expression
+case class Cond(cmp: Cmp.Value, left: Prim, right: Prim) extends Expression
+case class If(cond: Cond, tExp: Expression, fExp: Expression) extends Expression
 case class Bind(s: Sym, n: Expression) extends Expression
 case class Binds(binds: Bind*) extends Expression
 case class Lambda(vars: Vars, body: Expression) extends Expression
@@ -49,6 +68,7 @@ object Weather {
   def eval(exp: Expression, envStack: EnvStack = EnvStack(List.empty[Env])): Num =  exp match {
     case Prim(Num(n)) => Num(n)
     case Let(binds, body) => evalLet(binds, body, envStack)
+    case If(cond, tExp: Expression, fExp: Expression) => evalIf(cond, tExp, fExp, envStack)
     case Sym(x) => eval(lookupVars(Sym(x), envStack), envStack)
     case Exp(ope, es@_*) => evalOperation(ope, envStack, es:_*)
     case _ => throw new RuntimeException("Can't match AST")
@@ -67,6 +87,7 @@ object Weather {
 
   def evalOperation(ope: Expression, stack: EnvStack, es: Expression*): Num = {
     ope match {
+      case Prim(Num(n)) => Num(n)
       case Lambda(vars, body) => evalClosure(vars, body, stack, es:_*)
       case Closure(vars, body, localEnv) => evalClosure(vars, body, localEnv, es:_*)
       case Func(ope: Ope.Value) => operate(ope.func, stack, es:_*)
@@ -74,7 +95,20 @@ object Weather {
         val exp = lookupVars(Sym(x), stack)
         val newExp = exp ++ (es:_*)
         eval(newExp, stack)
-      case _ => throw new RuntimeException("Can't match any Operation")
+      case _ => throw new RuntimeException(s"Can't match any Operation: $ope")
+    }
+  }
+
+  def evalIf(cond: Cond, t: Expression, f: Expression, envStack: EnvStack): Num = {
+    cond match {
+      case Cond(cmp, Prim(Num(l)), Prim(Num(r))) =>
+        val b = cmp.func(Num(l), Num(r))
+        b match {
+          case Bool(true) => eval(t, envStack)
+          case _ => eval(f, envStack)
+        }
+      case _ => throw new RuntimeException("Can't eval Primitive except Num")
+
     }
   }
 
