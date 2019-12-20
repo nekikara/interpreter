@@ -85,14 +85,11 @@ case class EnvStack(envs: List[Env])
 
 object Weather {
   @scala.annotation.tailrec
-  def eval(exp: Expression, envStack: EnvStack = EnvStack(List.empty[Env])): Num =  exp match {
-    case Prim(Num(n)) => Num(n)
-    case Let(binds, body) => evalLet(binds, body, envStack)
-    case LetRec(binds, body) => evalLetRec(binds, body, envStack)
-    case If(cond, tExp: Expression, fExp: Expression) => evalIf(cond, tExp, fExp, envStack)
-    case Sym(x) => eval(lookupVars(Sym(x), envStack), envStack)
-    case Exp(ope, es@_*) => evalOperation(ope, envStack, es:_*)
-    case _ => throw new RuntimeException(s"Can't match AST => $exp \n $envStack")
+  def eval(exp: Expression, envStack: EnvStack = EnvStack(List.empty[Env])): Num = {
+    downExpression(exp, envStack) match {
+      case Prim(Num(n)) => Num(n)
+      case x => eval(x, envStack)
+    }
   }
 
   def evalList(envStack: EnvStack, exps: Expression*): Seq[Num] = {
@@ -117,7 +114,8 @@ object Weather {
     case If(cond, tExp: Expression, fExp: Expression) => Prim(evalIf(cond, tExp, fExp, stack))
     case Sym(x) => lookupVars(Sym(x), stack)
     case Exp(ope, es@_*) => Prim(evalOperation(ope, stack, es:_*))
-    case _ => exp
+    case Lambda(_, _) => exp
+    case _ => throw new RuntimeException(s"Can't find AST: $exp")
   }
 
   def evalOperation(ope: Expression, stack: EnvStack, es: Expression*): Num = {
