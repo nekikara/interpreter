@@ -61,7 +61,7 @@ case class Prim(p: Primitive) extends Expression {
   override def toString: String = s"$p"
 }
 case class Func(operator: Ope.Value) extends Expression {
-  override def toString: String = s"${operator.toString()}"
+  override def toString: String = s"$operator"
 }
 case class Let(binds: Binds, body: Expression) extends Expression {
   override def toString: String = s"<:let, $binds,\n\t$body/>"
@@ -202,9 +202,6 @@ object Weather {
 
   def extendEnvStack(stack: EnvStack, vars: Vars, exps: Seq[Expression]): EnvStack = {
     val list = vars.vars.zip(exps)
-    println("_________ extendEnvStack ___________")
-    println("args")
-    println(exps)
     val envMap = list.foldLeft(Map[Sym, Expression]().empty) { (acc, vr) =>
       val e = vr._2 match {
         case Lambda(vars, body) => convertLambdaToClosure(vars, body, stack)
@@ -212,8 +209,6 @@ object Weather {
       }
       acc + (vr._1 -> e)
     }
-    println("envMap")
-    println(envMap)
     EnvStack(Env(envMap) :: stack.envs)
   }
   def lookupVars(symbol: Sym, stack: EnvStack): Expression = {

@@ -33,6 +33,51 @@ def evalletrec(exp, env)
   _eval(new_exp, ext_env)
 end
 
+def eval_define(exp, env)
+  if define_with_param?(exp)
+    var, val = define_with_param_var_val(exp)
+  else
+    var, val = define_var_val(exp)
+  end
+  var_ref = lookup_var_ref(var, env)
+  if var_ref != nil
+    var_ref[var] = _eval(val, env)
+  else
+    extend_env!([var], [_eval(val, env)], env)
+  end
+  nil
+end
+
+def extend_env!(params, args,env)
+  als = params.zip(args)
+  h = Hash.new
+  als.each { |k, v| h[k] = v }
+  env.unshift(h)
+end
+
+def define_with_param?(exp)
+  list?(exp[1])
+end
+
+def define_with_param_var_val(exp)
+  var = car(exp[1])
+  params, body = cdr(exp[1]), exp[2]
+  val = [:lambda, params, body]
+  [var, val]
+end
+
+def define_var_val(exp)
+  [exp[1], exp[2]]
+end
+
+def lookup_var_ref(var, env)
+  env.find { |als| als.key?(var) }
+end
+
+def define?(exp)
+  exp[0] == :define
+end
+
 def set_extend_env!(params, args_val, ext_env)
   params.zip(args_val).each do |param, arg_val|
     ext_env[0][param] = arg_val
@@ -81,7 +126,9 @@ end
 def special_form?(exp)
   lambda?(exp) or
       let?(exp) or
-      letrec?(exp) or if?(exp)
+      letrec?(exp) or
+      if?(exp) or
+      define?(exp)
 end
 
 def lambda?(exp)
@@ -97,6 +144,8 @@ def eval_special_form(exp, env)
     eval_letrec(exp, env)
   elsif if?(exp)
     eval_if(exp, env)
+  elsif define?(exp)
+    eval_define(exp, env)
   end
 end
 
@@ -160,6 +209,30 @@ def _eval(exp, env)
   end
 end
 
+def null?(list)
+  list == []
+end
+
+def cons(a, b)
+  if not list?(b)
+    raise "sorry, we haven't implemented yet..."
+  else
+    [a] + b
+  end
+end
+
+def car(list)
+  list[0]
+end
+
+def cdr(list)
+  list[1..-1]
+end
+
+def list(*li)
+  li
+end
+
 $primitive_fun_env = {
     :+ => [:prim, lambda{|x, y| x + y}],
     :- => [:prim, lambda{|x, y| x - y}],
@@ -170,8 +243,16 @@ $primitive_fun_env = {
     :<= => [:prim, lambda{|x, y| x <= y}],
     :== => [:prim, lambda{|x, y| x == y}],
 }
+$list_env = {
+    nil: [],
+    null?: [:prim, lambda{|list| null?(list)}],
+    cons: [:prim, lambda{|a, b| cons(a, b)}],
+    car: [:prim, lambda{|list| car(list)}],
+    cdr: [:prim, lambda{|list| cdr(list)}],
+    list: [:prim, lambda{|*list| list(list)}],
+}
 $boolean_env = { true: true, false: false }
-$global_env = [$primitive_fun_env, $boolean_env]
+$global_env = [$list_env, $primitive_fun_env, $boolean_env]
 
 exp = [[:lambda, [:x, :y], [:+, :x, :y]], 3, 2]
 puts _eval(exp, $global_env)
