@@ -19,6 +19,26 @@ def eval_let(exp, env)
   _eval(new_exp, env)
 end
 
+def evalletrec(exp, env)
+  params, args, body = let_to_params_args_body(exp)
+  tmp_env = Hash.new
+  params.each do |param|
+    tmp_env[param] = :dummy
+  end
+
+  ext_env = extend_env(tmp_env.keys(), tmp_env.values(), env)
+  args_val = eval_list(args, ext_env)
+  set_extend_env!(params, args_val, ext_env)
+  new_exp = [[:lambda, params, body]] + args
+  _eval(new_exp, ext_env)
+end
+
+def set_extend_env!(params, args_val, ext_env)
+  params.zip(args_val).each do |param, arg_val|
+    ext_env[0][param] = arg_val
+  end
+end
+
 def let_to_params_args_body(exp)
   [exp[1].map{|e| e[0]}, exp[1].map{|e| e[1]}, exp[2]]
 end

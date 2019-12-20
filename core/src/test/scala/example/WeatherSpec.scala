@@ -142,4 +142,16 @@ class WeatherSpec extends FunSuite with DiagrammedAssertions {
     val expect = Num(1)
     assert(act == expect)
   }
+  test("can eval a letrec expression") {
+    val exp = LetRec(Binds(Bind(Sym('fact), Lambda(Vars(Sym('n)),
+                                              If(Cond(Cmp.Gt, Sym('n), Prim(Num(1))),
+                                                Prim(Num(1)),
+                                                Exp(Func(Ope.Multiply),
+                                                  Sym('n),
+                                                  Exp(Sym('fact), Exp(Func(Ope.Minus), Sym('n), Prim(Num(1))))))))),
+                Exp(Sym('fact), Prim(Num(4))))
+    val act = Weather.eval(exp)
+    val expect = Num(24)
+    assert(act == expect)
+  }
 }
