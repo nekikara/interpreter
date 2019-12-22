@@ -78,12 +78,24 @@ case class Vars(vars: Sym*) extends Expression {
   override def toString: String = s"[${vars.map(_.toString).mkString(", ")}/]"
 }
 case class Closure(params: Vars, body: Expression, envStack: EnvStack) extends Expression
+case class Define(definition: Definition) extends Expression
+
+sealed abstract class Definition
+case class NameArgsBound(nameArgs: List[Sym], body: Expression) extends Definition
+case class NameArgsSeparated(name: Sym, body: Expression) extends Definition
 
 // Env
 case class Env(map: Map[Sym, Expression])
 case class EnvStack(envs: List[Env])
 
 object Weather {
+  def evalStatement(defines: List[Define], exp: Expression): Num = {
+    val stack = defines.foldLeft(EnvStack(List.empty[Env])) {(acc, define) => {
+      evalDefine(define, acc)
+    }}
+    eval(exp, stack)
+  }
+
   @scala.annotation.tailrec
   def eval(exp: Expression, envStack: EnvStack = EnvStack(List.empty[Env])): Num = {
     downExpression(exp, envStack) match {
@@ -101,10 +113,7 @@ object Weather {
 
   def operate(fun: (Num, Num) => Num, envStack: EnvStack, exps: Expression*): Num = {
     val nums = evalList(envStack, exps:_*)
-    nums.tail.foldLeft(nums.head)(fun) match {
-      case Num(n) => Num(n)
-      case x => throw new RuntimeException(s"Can't operate this $x")
-    }
+    nums.tail.foldLeft(nums.head)(fun)
   }
 
   def downExpression(exp: Expression, stack: EnvStack): Expression = exp match {
@@ -198,6 +207,23 @@ object Weather {
     eval(body, newEnvStack)
   }
 
+  def evalDefine(define: Define, stack: EnvStack): EnvStack = {
+    val (name, exp): (Sym, Expression) = define.definition match {
+      case NameArgsSeparated(n, body) => (n, body)
+      case NameArgsBound(nameArgs, body) => (nameArgs.head, Lambda(Vars(nameArgs.tail:_*), body))
+    }
+    val newEnv: Map[Sym, Expression] = Map(name -> downExpression(exp, stack))
+    val defineEnv = stack.envs.lastOption match {
+      case Some(env) => env.map ++ newEnv
+      case None => newEnv
+    }
+    if (1 < stack.envs.length) {
+      EnvStack(stack.envs.init :+ Env(defineEnv))
+    } else {
+      EnvStack(List(Env(defineEnv)))
+    }
+  }
+
   def extendEnvStack(stack: EnvStack, vars: Vars, exps: Seq[Expression]): EnvStack = {
     val list = vars.vars.zip(exps)
     val envMap = list.foldLeft(Map[Sym, Expression]().empty) { (acc, vr) =>
@@ -222,6 +248,16 @@ object Weather {
         case x => x
       }
       case None => throw new RuntimeException(s"Not found the var: $symbol, $stack")
+    }
+  }
+
+  def lookupVarRef(sym: Sym, stack: EnvStack): Option[Sym] = {
+    stack.envs.lastOption match {
+      case Some(lastEnv) => lastEnv.map.find(pair => pair._1 == sym) match {
+        case Some(m) => Some(m._1)
+        case None => None
+      }
+      case None => None
     }
   }
 }

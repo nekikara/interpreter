@@ -154,4 +154,13 @@ class WeatherSpec extends FunSuite with DiagrammedAssertions {
     val expect = Num(24)
     assert(act == expect)
   }
+  test("can set define expressions and use them when evaluating") {
+    val define1 = Define(NameArgsSeparated(Sym('+), Lambda(Vars(Sym('x), Sym('y)), Exp(Func(Ope.Plus), Sym('x), Sym('y)))))
+    val define2 = Define(NameArgsBound(List(Sym('tenTimes), Sym('a), Sym('b)),
+                          Exp(Func(Ope.Multiply), Exp(Sym('+), Sym('a), Sym('b)), Prim(Num(10)))))
+    val exp = Exp(Sym('tenTimes), Prim(Num(3)), Prim(Num(3)))
+    val act = Weather.evalStatement(List(define1, define2), exp)
+    val expect = Num(60)
+    assert(act == expect)
+  }
 }
