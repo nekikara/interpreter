@@ -1,6 +1,5 @@
-package example
+package example.core
 
-import example.core._
 import org.scalatest._
 
 class WeatherSpec extends FunSuite with DiagrammedAssertions {

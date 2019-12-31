@@ -19,7 +19,7 @@ def eval_let(exp, env)
   _eval(new_exp, env)
 end
 
-def evalletrec(exp, env)
+def eval_letrec(exp, env)
   params, args, body = let_to_params_args_body(exp)
   tmp_env = Hash.new
   params.each do |param|
