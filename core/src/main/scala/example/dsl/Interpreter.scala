@@ -5,6 +5,7 @@ import example.core.Expression
 sealed abstract class EnvBody
 case class GlobalFun(f: Seq[Origin] => Origin) extends EnvBody
 case class BoolFun(f: Seq[Origin] => Boolean) extends EnvBody
+case class ElseFun(f: () => Boolean) extends EnvBody
 case class Val(evaluator: Evaluator) extends EnvBody
 case class F(f: Fun) extends EnvBody
 
@@ -42,6 +43,7 @@ object EnvStacks {
       '<= -> BoolFun((args: Seq[Origin]) => { Origins.all(args)(_ <= _) }),
       '> -> BoolFun((args: Seq[Origin]) => { Origins.all(args)(_ > _) }),
       '>= -> BoolFun((args: Seq[Origin]) => { Origins.all(args)(_ >= _) }),
+      'else -> ElseFun(() => { true }),
     )
     EnvStacks(List(globalFuncEnv))
   }
@@ -120,7 +122,15 @@ case class LetRecE(binds: List[(Symbol, Evaluator)], body: Evaluator) extends Ev
     Apply(Lda(vars, body), letArgs:_*).eval(EnvStacks(newEnv))
   }
 }
-//case class Cond() extends Evaluator
+case class CondE(cnds: (Evaluator, Evaluator)*) extends Evaluator {
+  override def eval(stack: EnvStacks): EvalResult = {
+    val f :: rest = cnds.toList
+    f._1.eval(stack) match {
+      case Result(B(true), _) => f._2.eval(stack)
+      case _ => CondE(rest:_*).eval(stack)
+    }
+  }
+}
 case class IfE(apl: Apply, tEvl: Evaluator, fEvl: Evaluator) extends Evaluator {
   override def eval(stack: EnvStacks): EvalResult = {
     apl.eval(stack) match {
@@ -177,6 +187,7 @@ case class Sy(value: Symbol) extends Fun {
       case None => throw new RuntimeException("Not Found a function")
       case Some(GlobalFun(f)) => f(args)
       case Some(BoolFun(f)) => B(f(args))
+      case Some(ElseFun(f)) => B(f())
       case Some(Val(evl)) => evl.eval(stack) match {
         case Nope(_) => throw new RuntimeException("Failed to evaluate Symbol evaluation")
         case Result(v, _) => v match {

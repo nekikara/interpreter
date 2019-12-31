@@ -65,6 +65,17 @@ class InterpreterSpec extends FunSuite with DiagrammedAssertions {
     assert(actual2.getOrigin.contains(B(true)))
   }
 
+  test("can eval Cond evaluators") {
+    val cond1 = CondE(
+      (Apply(Sy('>), Ori(N(1)), Ori(N(2))), Ori(N(1))),
+      (Apply(Sy('>=), Ori(N(4)), Ori(N(10))), Ori(N(2))),
+      (Apply(Sy('<=), Ori(N(1000)), Ori(N(10))), Ori(N(3))),
+      (Apply(Sy('else)), Ori(N(-1)))
+    )
+    val actual1 = cond1.eval(stack)
+    assert(actual1.getOrigin.contains(N(-1)))
+  }
+
   test("An Origin should calculate another origins") {
     val actual1 = N(1) + N(2)
     assert(actual1 == N(3))
