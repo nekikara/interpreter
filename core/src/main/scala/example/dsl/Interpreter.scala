@@ -92,7 +92,34 @@ case class LetE(binds: List[(Symbol, Evaluator)], body: Evaluator) extends Evalu
     apl.eval(newStack)
   }
 }
-//case class LetRec() extends Evaluator
+case class LetRecE(binds: List[(Symbol, Evaluator)], body: Evaluator) extends Evaluator {
+  override def eval(stack: EnvStacks): EvalResult = {
+    val env = binds.foldLeft(Map.empty[Symbol, Evaluator]) {(acc, pair) => {
+      acc + (pair._1 -> pair._2)
+    }}
+    val vars = env.keys.toList
+    val letArgs = env.values.toList
+    val letArgsEnvBodies = letArgs.map(Val)
+    val extEnv = stack.extend(vars, letArgsEnvBodies)
+    val argsVals = letArgsEnvBodies.map {
+      case Val(evl) => evl.eval(extEnv) match {
+        case Result(v, _) => v
+        case Nope(_) => throw new RuntimeException(s"Got wrong result: $evl")
+      }
+      case x => throw new RuntimeException(s"Can't eval except Val: $x")
+    }
+    val newEnv = extEnv.envs.zipWithIndex.map(pair => {
+      if (pair._2 == 0) {
+        vars.zip(argsVals).foldLeft(Map.empty[Symbol, EnvBody]) {(acc, p) => {
+          acc + (p._1 -> p._2.toEnvBody)
+        }}
+      } else {
+        pair._1
+      }
+    })
+    Apply(Lda(vars, body), letArgs:_*).eval(EnvStacks(newEnv))
+  }
+}
 //case class Cond() extends Evaluator
 case class IfE(apl: Apply, tEvl: Evaluator, fEvl: Evaluator) extends Evaluator {
   override def eval(stack: EnvStacks): EvalResult = {
@@ -113,6 +140,9 @@ case class Ref(ref: Symbol) extends Evaluator {
       case _ => throw new RuntimeException("Not Found a Ref")
     }
   }
+}
+case class LambdaE(lda: Lda) extends Evaluator {
+  override def eval(stack: EnvStacks): EvalResult = Result(FF(lda), stack)
 }
 
 sealed abstract class Def
@@ -149,7 +179,10 @@ case class Sy(value: Symbol) extends Fun {
       case Some(BoolFun(f)) => B(f(args))
       case Some(Val(evl)) => evl.eval(stack) match {
         case Nope(_) => throw new RuntimeException("Failed to evaluate Symbol evaluation")
-        case Result(v, _) => v
+        case Result(v, _) => v match {
+          case FF(f) => f.eval(stack, args:_*)
+          case x => x
+        }
       }
       case Some(F(fun)) => fun.eval(stack, args:_*)
     }
@@ -208,10 +241,12 @@ sealed trait Origin {
       case _ => throw new RuntimeException(s"Can't solve: $this >= $that")
     }
   }
+  def toEnvBody: EnvBody = Val(Ori(this))
 }
 case class N(value: Int) extends Origin
 case class L(values: N*) extends Origin
 case class B(value: Boolean) extends Origin
+case class FF(value: Fun) extends Origin
 
 object Origins {
   def all(args: Seq[Origin])(block: (Origin, Origin) => Boolean): Boolean = {

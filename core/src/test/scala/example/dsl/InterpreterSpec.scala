@@ -37,6 +37,17 @@ class InterpreterSpec extends FunSuite with DiagrammedAssertions {
     assert(actual1.getOrigin.contains(N(5)))
   }
 
+  test("can eval LetRec evaluations") {
+    val letRec1 = LetRecE(List(('fact,
+      LambdaE(Lda(List('n),
+        IfE(Apply(Sy('<), Ref('n), Ori(N(1))),
+          Ori(N(1)),
+          Apply(Sy('*), Ref('n), Apply(Sy('fact), Apply(Sy('-), Ref('n), Ori(N(1)))) )))))),
+      Apply(Sy('fact), Ori(N(3))))
+    val actual1 = letRec1.eval(stack)
+    assert(actual1.getOrigin.contains(N(6)))
+  }
+
   test("can eval Lambda evaluators") {
     val lda1 = Lda(List('x, 'y), Apply(Sy('*), Ref('y), Ori(N(100))))
     val apply1 = Apply(lda1, Ori(N(2)), Ori(N(20)))
