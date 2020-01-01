@@ -1,7 +1,5 @@
 package example.dsl
 
-import example.core.Expression
-
 sealed abstract class EnvBody
 case class GlobalFun(f: Seq[Origin] => Origin) extends EnvBody
 case class BoolFun(f: Seq[Origin] => Boolean) extends EnvBody
@@ -37,12 +35,33 @@ object EnvStacks {
       '+ -> GlobalFun((args: Seq[Origin]) => {args.reduce(_ + _)}),
       '- -> GlobalFun((args: Seq[Origin]) => {args.reduce(_ - _)}),
       '* -> GlobalFun((args: Seq[Origin]) => {args.reduce(_ * _)}),
+      'nil -> GlobalFun((_: Seq[Origin]) => L()),
+      'cons -> GlobalFun((args: Seq[Origin]) => Origins.renewL('cons, args) ),
+      'car -> GlobalFun((args: Seq[Origin]) => {
+        args.head match {
+          case L(ns@_*) => ns.head
+          case _ => L()
+        }
+      }),
+      'cdr -> GlobalFun((args: Seq[Origin]) => {
+        args.head match {
+          case L(ns@_*) => Origins.renewL('cdr, ns.tail)
+          case _ => L()
+        }
+      }),
+      'list -> GlobalFun((args: Seq[Origin]) => Origins.renewL('list, args) ),
       '== -> BoolFun((args: Seq[Origin]) => { Origins.all(args)(_ == _) }),
       '!= -> BoolFun((args: Seq[Origin]) => { Origins.all(args)(_ != _) }),
       '< -> BoolFun((args: Seq[Origin]) => { Origins.all(args)(_ < _) }),
       '<= -> BoolFun((args: Seq[Origin]) => { Origins.all(args)(_ <= _) }),
       '> -> BoolFun((args: Seq[Origin]) => { Origins.all(args)(_ > _) }),
       '>= -> BoolFun((args: Seq[Origin]) => { Origins.all(args)(_ >= _) }),
+      'isNull -> BoolFun((args: Seq[Origin]) => {
+        args.head match {
+          case L(ns@_*) => ns.isEmpty
+          case _ => false
+        }
+      }),
       'else -> ElseFun(() => { true }),
     )
     EnvStacks(List(globalFuncEnv))
@@ -63,13 +82,35 @@ trait Interpreter {
 }
 
 // Start Program
-sealed abstract class Program // extends Interpreter
-case class Stmt(statement: Statement) extends Program
-case class Expr(expression: Evaluator) extends Program
+sealed abstract class Program {
+  def run(stack: EnvStacks): EvalResult
+}
+case class Stmt(statement: Statement) extends Program {
+  override def run(stack: EnvStacks): EvalResult = {
+    statement.run(stack)
+  }
+}
+case class Expr(evaluator: Evaluator) extends Program {
+  override def run(stack: EnvStacks): EvalResult = {
+    evaluator.eval(stack)
+  }
+}
 
-sealed abstract class Statement
-case class Defn(definition: Def) extends Statement
-case class DefnProgram(definition: Def, program: Program) extends Statement
+sealed abstract class Statement {
+  def run(stack: EnvStacks): EvalResult
+}
+case class Defn(definition: Def) extends Statement {
+  override def run(stack: EnvStacks): EvalResult = {
+    val newStack = definition.load(stack)
+    Nope(newStack)
+  }
+}
+case class DefnProgram(definition: Def, program: Program) extends Statement {
+  override def run(stack: EnvStacks): EvalResult = {
+    val newStack = definition.load(stack)
+    program.run(newStack)
+  }
+}
 
 // Expression that can be evaluated immediately
 sealed abstract class Evaluator extends Interpreter
@@ -155,9 +196,28 @@ case class LambdaE(lda: Lda) extends Evaluator {
   override def eval(stack: EnvStacks): EvalResult = Result(FF(lda), stack)
 }
 
-sealed abstract class Def
-case class Bound(nameArgs: List[Symbol], body: Expression) extends Def
-case class Separated(name: Symbol, body: Fun) extends Def
+sealed abstract class Def {
+  def load(stack: EnvStacks): EnvStacks
+}
+case class Bound(nameArgs: List[Symbol], body: Evaluator) extends Def {
+  override def load(stack: EnvStacks): EnvStacks = {
+    val gEnv = stack.envs.last
+    val name = nameArgs.head
+    val params = nameArgs.tail
+    val lda = Lda(params, body)
+    LambdaE(lda).eval(stack) match {
+      case Nope(_) => throw new RuntimeException(s"Cannot load define: $this")
+      case Result(v, _) => {
+        EnvStacks(List(gEnv + (name -> Val(Ori(v)))))
+      }
+    }
+  }
+}
+case class Separated(name: Symbol, body: Fun) extends Def {
+  override def load(stack: EnvStacks): EnvStacks = {
+    stack
+  }
+}
 
 sealed abstract class Fun {
   def eval(stack: EnvStacks, args: Origin*): Origin
@@ -185,13 +245,17 @@ case class Sy(value: Symbol) extends Fun {
   override def eval(stack: EnvStacks, args: Origin*): Origin = {
     stack.lookup(value) match {
       case None => throw new RuntimeException("Not Found a function")
-      case Some(GlobalFun(f)) => f(args)
+      case Some(GlobalFun(f)) => {
+        f(args)
+      }
       case Some(BoolFun(f)) => B(f(args))
       case Some(ElseFun(f)) => B(f())
       case Some(Val(evl)) => evl.eval(stack) match {
         case Nope(_) => throw new RuntimeException("Failed to evaluate Symbol evaluation")
         case Result(v, _) => v match {
-          case FF(f) => f.eval(stack, args:_*)
+          case FF(f) => {
+            f.eval(stack, args:_*)
+          }
           case x => x
         }
       }
@@ -273,4 +337,18 @@ object Origins {
       }._2
     }
   }
+
+  def renewL(name: Symbol, args: Seq[Origin]): Origin = {
+    args.foldLeft(L()) { (acc: L, arg) => {
+      arg match {
+        case N(n) => L(acc.values.toList :+ N(n):_*)
+        case L(l@_*) => {
+          val nList = acc.values.toList ++ l.toList
+          L(nList:_*)
+        }
+        case _ => throw new RuntimeException("Failed to cons")
+      }
+    }}
+  }
 }
+

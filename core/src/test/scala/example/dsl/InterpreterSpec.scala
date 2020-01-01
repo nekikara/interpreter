@@ -76,6 +76,29 @@ class InterpreterSpec extends FunSuite with DiagrammedAssertions {
     assert(actual1.getOrigin.contains(N(-1)))
   }
 
+  test("can read a Program") {
+    val program = Stmt(DefnProgram(
+      Bound(List('length, 'li),
+        IfE(Apply(Sy('isNull), Ref('li)),
+          Ori(N(0)),
+          Apply(Sy('+), Apply(Sy('length), Apply(Sy('cdr), Ref('li))), Ori(N(1))))),
+      Expr(Apply(Sy('length), Apply(Sy('list), Ori(N(-1)), Ori(N(1)), Ori(N(2)), Ori(N(3))) ))
+    ))
+    val actual1 = program.run(stack)
+    assert(actual1.getOrigin.contains(N(4)))
+  }
+
+  test("can process List Functions") {
+    val listFun1 = Apply(Sy('list), Ori(N(1)), Ori(N(2)))
+    val actual1 = listFun1.eval(stack)
+    assert(actual1.getOrigin.contains(L(N(1), N(2))))
+
+    val lda1 = Lda(List('li), Apply(Sy('isNull), Ref('li)))
+    val apply1 = Apply(lda1, Ori(L()))
+    val actual2 = apply1.eval(stack)
+    assert(actual2.getOrigin.contains(B(true)))
+  }
+
   test("An Origin should calculate another origins") {
     val actual1 = N(1) + N(2)
     assert(actual1 == N(3))
