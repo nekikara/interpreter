@@ -83,6 +83,7 @@ trait Interpreter {
 
 // Start Program
 sealed abstract class Program {
+  def runDefault(): EvalResult = this.run(EnvStacks.default())
   def run(stack: EnvStacks): EvalResult
 }
 case class Stmt(statement: Statement) extends Program {

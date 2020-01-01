@@ -6,6 +6,7 @@ val scalaTest = "org.scalatest" %% "scalatest" % "3.0.5"
 
 lazy val main = (project in file("."))
   .aggregate(core)
+  .dependsOn(core)
   .enablePlugins(JavaAppPackaging)
   .settings(
     name := "Main",
